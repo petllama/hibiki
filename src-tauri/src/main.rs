@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio_devices;
+mod audio_engine;
 mod commands;
 mod db;
 mod deezer;
@@ -9,7 +10,9 @@ mod genius;
 mod itunes;
 mod itunes_throttle;
 mod lastfm;
+mod listenbrainz;
 mod mediasession;
+mod musicbrainz;
 mod plex;
 mod plextv;
 mod podcast;
@@ -259,6 +262,20 @@ pub fn run() {
             // Start audio device change listener (emits audio-device-changed events).
             audio_devices::start_device_listener(app.handle());
 
+            // Start the Rust audio engine (cpal output, symphonia decode, DSP chain).
+            match audio_engine::AudioEngine::start(app.handle().clone()) {
+                Ok(engine) => {
+                    app.manage(audio_engine::bridge::AudioEngineState(
+                        std::sync::Arc::new(engine),
+                    ));
+                }
+                Err(e) => {
+                    tracing::error!("Failed to start audio engine: {}", e);
+                    // Still manage a dummy state so commands don't crash — they'll
+                    // just fail gracefully when trying to send to a dead channel.
+                }
+            }
+
             // Remove the native OS menu bar (redundant on Windows with our custom titlebar).
             app.remove_menu().ok();
 
@@ -377,6 +394,7 @@ pub fn run() {
             commands::get_stream_url,
             commands::get_thumb_url,
             commands::get_audio_transcode_url,
+            commands::fetch_audio_bytes,
             // Server info (Phase 5)
             commands::get_identity,
             commands::get_server_info,
@@ -457,6 +475,16 @@ pub fn run() {
             commands::genius_set_always_fetch,
             commands::genius_search,
             commands::genius_get_lyrics,
+            // MusicBrainz integration
+            commands::musicbrainz_get_artist_info,
+            commands::musicbrainz_get_album_info,
+            commands::musicbrainz_lookup_recording,
+            // ListenBrainz integration
+            commands::listenbrainz_save_token,
+            commands::listenbrainz_disconnect,
+            commands::listenbrainz_set_enabled,
+            commands::listenbrainz_submit_now_playing,
+            commands::listenbrainz_submit_listen,
             // Generic HTTP proxy
             commands::http_get_json,
             // Audio device detection
@@ -492,6 +520,30 @@ pub fn run() {
             subsonic_commands::sync_navidrome_albums,
             subsonic_commands::sync_navidrome_tracks,
             subsonic_commands::sync_navidrome_full,
+            // Rust audio engine
+            audio_engine::bridge::audio_play,
+            audio_engine::bridge::audio_preload_next,
+            audio_engine::bridge::audio_pause,
+            audio_engine::bridge::audio_resume,
+            audio_engine::bridge::audio_stop,
+            audio_engine::bridge::audio_seek,
+            audio_engine::bridge::audio_set_volume,
+            audio_engine::bridge::audio_set_normalization,
+            audio_engine::bridge::audio_set_preamp_gain,
+            audio_engine::bridge::audio_set_eq,
+            audio_engine::bridge::audio_set_eq_enabled,
+            audio_engine::bridge::audio_set_eq_postgain,
+            audio_engine::bridge::audio_duck_and_apply,
+            audio_engine::bridge::audio_set_crossfade_window,
+            audio_engine::bridge::audio_set_same_album_crossfade,
+            audio_engine::bridge::audio_set_smart_crossfade,
+            audio_engine::bridge::audio_set_smart_crossfade_max,
+            audio_engine::bridge::audio_set_mixramp_db,
+            audio_engine::bridge::audio_set_visualizer_enabled,
+            audio_engine::bridge::audio_get_sample_rate,
+            audio_engine::bridge::audio_set_cache_max_bytes,
+            audio_engine::bridge::audio_clear_cache,
+            audio_engine::bridge::audio_get_cache_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
