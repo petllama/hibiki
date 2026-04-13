@@ -244,12 +244,24 @@ export function ContextMenu() {
 
   function doPlay() {
     if (track) void playTrack(track)
-    else if (album && provider?.buildItemUri) {
-      const uri = provider.buildItemUri(album.providerKey ?? `/library/metadata/${album.id}`)
-      void playFromUri(uri, false, album.title, `/album/${album.id}`)
-    } else if (artist && provider?.buildItemUri) {
-      const uri = provider.buildItemUri(artist.providerKey ?? `/library/metadata/${artist.id}`)
-      void playFromUri(uri, false, artist.title, `/artist/${artist.id}`)
+    else if (album && provider) {
+      if (provider.buildItemUri) {
+        const uri = provider.buildItemUri(album.providerKey ?? `/library/metadata/${album.id}`)
+        void playFromUri(uri, false, album.title, `/album/${album.id}`)
+      } else {
+        void provider.getAlbumTracks(album.id).then(tracks => {
+          if (tracks.length > 0) void playTrack(tracks[0], tracks, album.title, `/album/${album.id}`)
+        })
+      }
+    } else if (artist && provider) {
+      if (provider.buildItemUri) {
+        const uri = provider.buildItemUri(artist.providerKey ?? `/library/metadata/${artist.id}`)
+        void playFromUri(uri, false, artist.title, `/artist/${artist.id}`)
+      } else {
+        void provider.getArtistPopularTracks(artist.id).then(tracks => {
+          if (tracks.length > 0) void playTrack(tracks[0], tracks, artist.title, `/artist/${artist.id}`)
+        })
+      }
     }
     close()
   }
@@ -272,9 +284,15 @@ export function ContextMenu() {
         addToQueue(tracks)
         close()
       })
-    } else if (artist && provider?.buildItemUri) {
-      const uri = provider.buildItemUri(artist.providerKey ?? `/library/metadata/${artist.id}`)
-      void playFromUri(uri, true, artist.title, `/artist/${artist.id}`)
+    } else if (artist && provider) {
+      if (provider.buildItemUri) {
+        const uri = provider.buildItemUri(artist.providerKey ?? `/library/metadata/${artist.id}`)
+        void playFromUri(uri, true, artist.title, `/artist/${artist.id}`)
+      } else {
+        void provider.getArtistPopularTracks(artist.id).then(tracks => {
+          addToQueue(tracks)
+        })
+      }
       close()
     }
   }

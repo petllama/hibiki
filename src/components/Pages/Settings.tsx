@@ -16,9 +16,9 @@ import { useCardSizeStore, CARD_SIZE_MIN, CARD_SIZE_MAX } from "../../stores/car
 import { useHighlightStore, HIGHLIGHT_DEFAULTS, type HighlightCategory } from "../../stores/highlightStore"
 import { useNotificationStore } from "../../stores/notificationStore"
 import { useDebugStore } from "../../stores/debugStore"
-import { useUIStore } from "../../stores"
+import { useUIStore, useConnectionStore } from "../../stores"
 import { useEasterEggStore } from "../../stores/easterEggStore"
-import { plexBackend } from "../../backends/plex/definition"
+import { backends } from "../../backends/registry"
 import { metadataBackends, getMetadataBackend } from "../../metadata"
 import type { ProviderCapabilities } from "../../providers/types"
 import type { MetadataCapabilities } from "../../metadata/types"
@@ -37,13 +37,13 @@ import { clearMetadataCache, getMetadataCacheStats } from "../../stores/metadata
 // ---------------------------------------------------------------------------
 
 type Section =
-  | "plex" | "metadata" | `metadata/${string}`
+  | "backend" | "metadata" | `metadata/${string}`
   | "playback" | "appearance" | "cache" | "general" | "about" | "eastereggs"
 
 const NAV: { id: Section; label: string; icon: React.ReactNode }[] = [
   {
-    id: "plex",
-    label: "Plex",
+    id: "backend",
+    label: "Server",
     icon: (
       <svg height="18" width="18" viewBox="0 0 24 24" fill="currentColor">
         <path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
@@ -1049,9 +1049,9 @@ const METADATA_CAPABILITY_LABELS: Record<keyof MetadataCapabilities, string> = {
 }
 
 const SOURCE_ICONS: Record<MetadataSource, React.ReactNode> = {
-  plex: (
+  server: (
     <svg height="18" width="18" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+      <path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
     </svg>
   ),
   deezer: (
@@ -1098,7 +1098,9 @@ function CapabilityGrid({ caps, labels }: { caps: { [k: string]: boolean }; labe
   )
 }
 
-function PlexSection() {
+function BackendSection() {
+  const activeBackend = useConnectionStore(s => s.activeBackend)
+  const setActiveBackend = useConnectionStore(s => s.setActiveBackend)
   const [imgCacheInfo, setImgCacheInfo] = useState<ImageCacheInfo | null>(null)
   const [imgClearing, setImgClearing] = useState(false)
 
@@ -1117,20 +1119,47 @@ function PlexSection() {
     }
   }
 
+  const backend = activeBackend ?? backends[0]
+  if (!backend) return null
+
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Plex connection settings */}
+      {/* Backend picker — only show when multiple backends are registered */}
+      {backends.length > 1 && (
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-white/25 mb-4">Backend</h3>
+          <div className="flex gap-2">
+            {backends.map(b => (
+              <button
+                key={b.id}
+                onClick={() => void setActiveBackend(b.id)}
+                className={clsx(
+                  "flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors",
+                  b.id === backend.id
+                    ? "border-accent bg-accent/10 text-white"
+                    : "border-white/10 text-white/50 hover:border-white/20 hover:text-white"
+                )}
+              >
+                <b.icon size={18} />
+                {b.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Connection settings from active backend */}
       <div>
         <h3 className="text-xs font-bold uppercase tracking-widest text-white/25 mb-4">Capabilities</h3>
-        <CapabilityGrid caps={plexBackend.capabilities as unknown as { [k: string]: boolean }} labels={CAPABILITY_LABELS} />
+        <CapabilityGrid caps={backend.capabilities as unknown as { [k: string]: boolean }} labels={CAPABILITY_LABELS} />
       </div>
       <div>
         <h3 className="text-xs font-bold uppercase tracking-widest text-white/25 mb-4">Settings</h3>
-        <plexBackend.SettingsComponent />
+        <backend.SettingsComponent />
       </div>
 
       {/* Image Cache */}
-      <SettingCard title="Image Cache" description="Artwork fetched from Plex and external metadata sources is saved to disk.">
+      <SettingCard title="Image Cache" description="Artwork fetched from your server and external metadata sources is saved to disk.">
         <div className="flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white">Cached Images</p>
@@ -1711,18 +1740,18 @@ export function SettingsPage({ section: sectionProp }: { section?: string }) {
 
   // Map old routes to new ones
   const mappedSection = (() => {
-    const raw = sectionProp || "plex"
+    const raw = sectionProp || "backend"
     if (raw === "experience") return "appearance"
     if (raw === "notifications" || raw === "debug") return "general"
     if (raw === "downloads" || raw === "ai") return "general"
-    if (raw === "backends") return "plex"
+    if (raw === "backends" || raw === "plex") return "backend"
     if (raw.startsWith("backends/")) return raw.replace("backends/", "metadata/")
     return raw
   })()
   const section: Section = mappedSection as Section
 
   const setSection = (s: Section) => {
-    navigate(s === "plex" ? "/settings" : `/settings/${s}`)
+    navigate(s === "backend" ? "/settings" : `/settings/${s}`)
   }
 
   const navItems = easterEggsUnlocked ? [...NAV, EASTER_EGG_NAV] : NAV
@@ -1771,7 +1800,7 @@ export function SettingsPage({ section: sectionProp }: { section?: string }) {
           </h1>
         )}
 
-        {section === "plex" && <PlexSection />}
+        {section === "backend" && <BackendSection />}
         {section === "metadata" && <MetadataListView setSection={setSection} />}
         {section.startsWith("metadata/") && (
           <MetadataSubPage backendId={section.slice(9)} goBack={() => setSection("metadata")} />

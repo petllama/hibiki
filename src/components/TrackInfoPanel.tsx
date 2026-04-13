@@ -162,19 +162,24 @@ export default function TrackInfoPanel({ onClose }: Props) {
     }
   }
 
-  // Debug rows — intentionally backend-aware (shows raw provider data)
+  // Debug rows — shows raw provider data from any backend
   const debugRows: [string, string][] = []
   if (debugEnabled) {
     const pd = track._providerData as any
-    const pdPart = pd?.media?.[0]?.parts?.[0]
     debugRows.push(["ID", track.id])
+    // Plex-specific fields
     if (pd?.key) debugRows.push(["Key", pd.key])
     if (pd?.library_section_id) debugRows.push(["Library Section", String(pd.library_section_id)])
-    if (pdPart?.file) debugRows.push(["File", pdPart.file])
+    const filePath = pd?.media?.[0]?.parts?.[0]?.file ?? pd?.path
+    if (filePath) debugRows.push(["File", filePath])
     if (pd?.music_analysis_version != null) debugRows.push(["Music Analysis v", String(pd.music_analysis_version)])
+    // Subsonic-specific fields
+    if (pd?.suffix) debugRows.push(["Format", pd.suffix])
+    if (pd?.contentType) debugRows.push(["Content-Type", pd.contentType])
+    // Generic fields
     if (track.playCount != null) debugRows.push(["Play Count", String(track.playCount)])
     if (track.addedAt) debugRows.push(["Added At", track.addedAt])
-    if (pd?.updated_at) debugRows.push(["Updated At", pd.updated_at])
+    if (pd?.updated_at ?? pd?.created) debugRows.push(["Updated At", pd.updated_at ?? pd.created])
   }
 
   const SectionTable = ({ rows: r, mono }: { rows: [string, string][]; mono?: boolean }) => (

@@ -25,6 +25,8 @@ interface ConnectionState {
   musicSectionId: number | null
   sectionUuid: string | null
   musicSectionTitle: string | null
+  /** Backend-agnostic library identifier — derived from musicSectionId for Plex. */
+  libraryKey: string | null
 
   allUrls: string[]
 
@@ -55,6 +57,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   musicSectionId: null,
   sectionUuid: null,
   musicSectionTitle: null,
+  libraryKey: null,
   allUrls: [],
   availableMusicSections: [],
   needsLibraryPick: false,
@@ -170,6 +173,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         musicSectionId: section.key,
         sectionUuid: section.uuid ?? null,
         musicSectionTitle: section.title,
+        libraryKey: String(section.key),
         needsLibraryPick: false,
       })
     } catch (err) {
@@ -220,6 +224,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         musicSectionId: section.key,
         sectionUuid: section.uuid ?? null,
         musicSectionTitle: section.title,
+        libraryKey: String(section.key),
         needsLibraryPick: false,
       })
     } catch (err) {
@@ -239,6 +244,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       musicSectionId: null,
       sectionUuid: null,
       musicSectionTitle: null,
+      libraryKey: null,
       availableMusicSections: [],
       needsLibraryPick: false,
     })
@@ -260,6 +266,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       musicSectionId: null,
       sectionUuid: null,
       musicSectionTitle: null,
+      libraryKey: null,
       availableMusicSections: [],
       needsLibraryPick: false,
     })

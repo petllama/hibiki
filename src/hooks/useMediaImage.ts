@@ -52,7 +52,7 @@ export function useArtistImage(
   const deezerUrl = deezerEntry?.data?.image_url ?? null
 
   for (const source of priority) {
-    if (source === "plex" && plexThumb) return plexThumb
+    if (source === "server" && plexThumb) return plexThumb
     if (source === "deezer" && deezerUrl) {
       const id = artistId ?? key
       return id ? buildImageUrl("artist", id, deezerUrl, artistName) : null
@@ -106,7 +106,7 @@ export function useAlbumImage(
   }, [artistName, albumName, plexThumb, deezerUrl, deezerHydrated, itunesHydrated, deezerEntry !== undefined, itunesEntry !== undefined, getDeezerAlbum, getItunesAlbum])
 
   for (const source of priority) {
-    if (source === "plex"   && plexThumb) return plexThumb
+    if (source === "server"   && plexThumb) return plexThumb
     if (source === "deezer" && deezerUrl) {
       const id = albumId ?? key
       return id ? buildImageUrl("album", id, deezerUrl, albumName, artistName) : null

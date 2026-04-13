@@ -11,7 +11,7 @@ import { IS_MACOS } from "../lib/platform"
 export function TopBar() {
   const [location, navigate] = useLocation()
   const { search, clear, setQuery, query } = useSearchStore(useShallow(s => ({ search: s.search, clear: s.clear, setQuery: s.setQuery, query: s.query })))
-  const { musicSectionId, isConnected } = useConnectionStore(useShallow(s => ({ musicSectionId: s.musicSectionId, isConnected: s.isConnected })))
+  const { libraryKey, isConnected } = useConnectionStore(useShallow(s => ({ libraryKey: s.libraryKey, isConnected: s.isConnected })))
   const wsConnected = useLibraryStore(s => s.wsConnected)
   const { isRefreshing, setIsRefreshing, incrementPageRefreshKey } = useUIStore(useShallow(s => ({ isRefreshing: s.isRefreshing, setIsRefreshing: s.setIsRefreshing, incrementPageRefreshKey: s.incrementPageRefreshKey })))
   const { refreshAll, invalidateCache } = useLibraryStore(useShallow(s => ({ refreshAll: s.refreshAll, invalidateCache: s.invalidateCache })))
@@ -30,7 +30,7 @@ export function TopBar() {
       }
     }, 350)
     return () => clearTimeout(timer)
-  }, [localQuery, musicSectionId])
+  }, [localQuery, libraryKey])
 
   // Keep store in sync immediately for showResults logic
   useEffect(() => {
@@ -53,10 +53,10 @@ export function TopBar() {
       window.removeEventListener("plexify:search-focus", onSearchFocus)
       window.removeEventListener("plexify:refresh", onRefresh)
     }
-  }, [musicSectionId, isRefreshing])
+  }, [libraryKey, isRefreshing])
 
   const handleRefresh = async () => {
-    if (!musicSectionId || isRefreshing) return
+    if (!libraryKey || isRefreshing) return
     setIsRefreshing(true)
     try {
       invalidateCache()

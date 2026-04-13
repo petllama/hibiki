@@ -11,7 +11,10 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(|e| format!("Failed to read schema version: {e}"))?;
 
-    let migrations: &[(i64, &str)] = &[(1, include_str!("migrations/V1__initial.sql"))];
+    let migrations: &[(i64, &str)] = &[
+        (1, include_str!("migrations/V1__initial.sql")),
+        (2, include_str!("migrations/V2__multi_backend.sql")),
+    ];
 
     for &(version, sql) in migrations {
         if current_version < version {
@@ -36,17 +39,17 @@ mod tests {
 
         // Run once
         run_migrations(&conn).expect("first run");
-        let v1: i64 = conn
+        let v: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(v1, 1);
+        assert_eq!(v, 2);
 
         // Run again — should be a no-op
         run_migrations(&conn).expect("second run");
         let v2: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(v2, 1);
+        assert_eq!(v2, 2);
     }
 
     #[test]
@@ -64,18 +67,12 @@ mod tests {
             .collect();
 
         let expected = vec![
-            "album_reviews",
             "albums",
-            "artist_locations",
             "artists",
             "kv",
-            "lyrics",
-            "media",
-            "media_parts",
             "play_history",
             "playlist_tracks",
             "playlists",
-            "streams",
             "tags",
             "tracks",
         ];

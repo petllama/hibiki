@@ -66,20 +66,20 @@ export const useLyricsStore = create<LyricsState>((set, get) => ({
       if (plexLines.length > 0) {
         const isSynced = plexLines.some(l => l.startMs > 0 || l.endMs > 0)
         sources.push({
-          id: "plex",
-          label: "Plex",
+          id: "server",
+          label: "Server",
           lines: plexLines,
           isSynced,
         })
       }
 
-      // Push plex lyrics immediately so the user sees them
+      // Push server lyrics immediately so the user sees them
       if (sources.length > 0) {
-        set({ sources, activeSourceId: "plex" })
+        set({ sources, activeSourceId: "server" })
         pushLyricsToPlayer(sources[0].lines)
       }
 
-      // 2. If Genius enabled AND (alwaysFetch OR Plex returned empty): search Genius
+      // 2. If Genius enabled AND (alwaysFetch OR server returned empty): search Genius
       // Only fetch from Genius if the lyrics UI is actually visible
       const ui = useUIStore.getState()
       const lyricsVisible = ui.isLyricsOpen || (ui.isQueuePinned && ui.queueActiveTab === "lyrics")

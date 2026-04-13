@@ -15,8 +15,11 @@ mod plextv;
 mod podcast;
 mod podcastindex;
 mod radiobrowser;
+mod subsonic;
+mod subsonic_commands;
 
 use commands::PlexState;
+use subsonic_commands::SubsonicState;
 use mediasession::MediaSessionState;
 use once_cell::sync::Lazy;
 use tauri::Manager;
@@ -232,6 +235,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .manage(PlexState::new())
+        .manage(SubsonicState::new())
         .setup(|app| {
             // Open (or create) the local SQLite database.
             let db_path = app
@@ -458,6 +462,36 @@ pub fn run() {
             // Audio device detection
             commands::get_audio_output_device,
             commands::get_audio_output_devices,
+            // Subsonic / Navidrome
+            subsonic_commands::subsonic_connect,
+            subsonic_commands::subsonic_ping,
+            subsonic_commands::subsonic_get_artists,
+            subsonic_commands::subsonic_get_artist,
+            subsonic_commands::subsonic_get_album,
+            subsonic_commands::subsonic_get_song,
+            subsonic_commands::subsonic_search,
+            subsonic_commands::subsonic_get_album_list,
+            subsonic_commands::subsonic_get_top_songs,
+            subsonic_commands::subsonic_get_stream_url,
+            subsonic_commands::subsonic_get_cover_art_url,
+            subsonic_commands::subsonic_get_playlists,
+            subsonic_commands::subsonic_get_playlist,
+            subsonic_commands::subsonic_create_playlist,
+            subsonic_commands::subsonic_update_playlist,
+            subsonic_commands::subsonic_delete_playlist,
+            subsonic_commands::subsonic_star,
+            subsonic_commands::subsonic_unstar,
+            subsonic_commands::subsonic_set_rating,
+            subsonic_commands::subsonic_scrobble,
+            subsonic_commands::subsonic_get_starred,
+            subsonic_commands::subsonic_get_genres,
+            subsonic_commands::subsonic_load_settings,
+            subsonic_commands::subsonic_save_settings,
+            // Navidrome sync
+            subsonic_commands::sync_navidrome_artists,
+            subsonic_commands::sync_navidrome_albums,
+            subsonic_commands::sync_navidrome_tracks,
+            subsonic_commands::sync_navidrome_full,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

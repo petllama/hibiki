@@ -1,8 +1,8 @@
 //! Local SQLite database layer.
 //!
-//! Stores artists, albums, tracks, playlists, and metadata from Plex with
-//! properly typed columns — enabling fast queries, local search, and
-//! deduplication.
+//! Stores artists, albums, tracks, playlists, and metadata from any backend
+//! (Plex, Navidrome, etc.) with composite `(backend, id)` primary keys to
+//! prevent cross-backend collisions.
 
 pub mod albums;
 pub mod artists;
@@ -56,23 +56,9 @@ pub struct DbInfo {
     pub play_history_count: i64,
 }
 
-/// Helper: parse a Plex API path like "/library/metadata/12345" into the
-/// trailing numeric ID, or return `None` if the path doesn't match.
-pub fn parse_plex_id(path: &str) -> Option<i64> {
-    path.rsplit('/').next().and_then(|s| s.parse().ok())
-}
-
 /// Convert an `Option<DateTime<Utc>>` to an ISO 8601 string or None.
 pub fn datetime_to_iso(dt: &Option<chrono::DateTime<chrono::Utc>>) -> Option<String> {
     dt.map(|d| d.to_rfc3339())
-}
-
-/// Parse an ISO 8601 string back to `Option<DateTime<Utc>>`.
-#[allow(dead_code)]
-pub fn iso_to_datetime(s: &Option<String>) -> Option<chrono::DateTime<chrono::Utc>> {
-    s.as_ref()
-        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-        .map(|d| d.with_timezone(&chrono::Utc))
 }
 
 #[cfg(test)]
@@ -80,18 +66,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_plex_id() {
-        assert_eq!(parse_plex_id("/library/metadata/12345"), Some(12345));
-        assert_eq!(parse_plex_id("/library/metadata/42/children"), None);
-        assert_eq!(parse_plex_id(""), None);
-        assert_eq!(parse_plex_id("12345"), Some(12345));
-    }
-
-    #[test]
     fn test_open_in_memory() {
         let db = DbState::open_in_memory().expect("should open in-memory db");
         let conn = db.0.lock().unwrap();
-        // Verify tables exist by running a count query
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM artists", [], |r| r.get(0))
             .unwrap();

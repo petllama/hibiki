@@ -30,7 +30,7 @@
   },
   "settings": {
     "title": "Settings",
-    "plex": "Plex",
+    "server": "Server",
     "metadata": "Metadata",
     "playback": "Playback",
     "appearance": "Appearance",

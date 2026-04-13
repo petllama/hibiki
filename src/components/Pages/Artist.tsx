@@ -76,6 +76,17 @@ function DeezerArtistAvatar({ name }: { name: string }) {
 export function ArtistPage({ artistId }: { artistId: string }) {
   const provider = useProviderStore(s => s.provider)
   const { playTrack, playFromUri, playRadio, addToQueue, currentTrack } = usePlayerStore(useShallow(s => ({ playTrack: s.playTrack, playFromUri: s.playFromUri, playRadio: s.playRadio, addToQueue: s.addToQueue, currentTrack: s.currentTrack })))
+
+  /** Play an album: use server-side URI if available, else fetch tracks client-side. */
+  function playAlbum(albumId: string, title: string) {
+    const uri = provider?.buildItemUri?.(`/library/metadata/${albumId}`)
+    if (uri) { void playFromUri(uri, false, title, `/album/${albumId}`); return }
+    if (!provider) return
+    void provider.getAlbumTracks(albumId).then(tracks => {
+      if (tracks.length > 0) void playTrack(tracks[0], tracks, title, `/album/${albumId}`)
+    })
+  }
+
   const { handler: ctxMenu, isTarget: isCtxTarget } = useContextMenu()
   const trackDrag = useTrackDrag()
   const pageRefreshKey = useUIStore(s => s.pageRefreshKey)
@@ -194,7 +205,7 @@ export function ArtistPage({ artistId }: { artistId: string }) {
   const deezerUrl = deezerData?.image_url ? buildImageUrl("artist", artistId, deezerData.image_url, artist?.title) : null
   let artUrl: string | null = null
   for (const src of priority) {
-    if (src === "plex"   && plexArt)   { artUrl = plexArt;   break }
+    if (src === "server"   && plexArt)   { artUrl = plexArt;   break }
     if (src === "deezer" && deezerUrl) { artUrl = deezerUrl; break }
   }
   if (!artUrl) artUrl = plexArt ?? deezerUrl ?? null
@@ -264,7 +275,7 @@ export function ArtistPage({ artistId }: { artistId: string }) {
   const plexThumb = artist.thumbUrl ?? null
   let thumbUrl: string | null = null
   for (const src of priority) {
-    if (src === "plex"   && plexThumb) { thumbUrl = plexThumb; break }
+    if (src === "server"   && plexThumb) { thumbUrl = plexThumb; break }
     if (src === "deezer" && deezerUrl) { thumbUrl = deezerUrl; break }
   }
   if (!thumbUrl) thumbUrl = plexThumb ?? deezerUrl ?? null
@@ -278,12 +289,12 @@ export function ArtistPage({ artistId }: { artistId: string }) {
   let displayBio: string | undefined
   for (const src of priority) {
     if (src === "lastfm" && lastfmData?.bio)  { displayBio = lastfmData.bio;  break }
-    if (src === "plex"   && artist.summary)   { displayBio = artist.summary;  break }
+    if (src === "server"   && artist.summary)   { displayBio = artist.summary;  break }
   }
 
   // Merge tags in priority order; Plex genres always valid; external tags filtered.
   const tagsBySource: Record<string, string[]> = {
-    plex:   genres,
+    server: genres,
     lastfm: (lastfmData?.tags ?? []).filter(t => plexTagSet.has(t.toLowerCase())),
     deezer: [],   // artist info has no genre tags
     apple:  itunesData?.genre && plexTagSet.has(itunesData.genre.toLowerCase())
@@ -328,8 +339,13 @@ export function ArtistPage({ artistId }: { artistId: string }) {
         <div className="absolute bottom-8 right-8 z-20 flex items-center gap-3">
           {/* Play */}
           <button
-            onClick={() => artistUri && void playFromUri(artistUri, false, artist.title, `/artist/${artistId}`)}
-            disabled={!artistUri}
+            onClick={() => {
+              if (artistUri) { void playFromUri(artistUri, false, artist.title, `/artist/${artistId}`); return }
+              if (!provider) return
+              void provider.getArtistPopularTracks(artistId).then(tracks => {
+                if (tracks.length > 0) void playTrack(tracks[0], tracks, artist.title, `/artist/${artistId}`)
+              })
+            }}
             title="Play"
             className="flex h-14 w-14 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-accent hover:bg-black/45 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -339,8 +355,14 @@ export function ArtistPage({ artistId }: { artistId: string }) {
           </button>
           {/* Shuffle */}
           <button
-            onClick={() => artistUri && void playFromUri(artistUri, true, artist.title, `/artist/${artistId}`)}
-            disabled={!artistUri}
+            onClick={() => {
+              if (artistUri) { void playFromUri(artistUri, true, artist.title, `/artist/${artistId}`); return }
+              if (!provider) return
+              void provider.getArtistPopularTracks(artistId).then(tracks => {
+                const shuffled = [...tracks].sort(() => Math.random() - 0.5)
+                if (shuffled.length > 0) void playTrack(shuffled[0], shuffled, artist.title, `/artist/${artistId}`)
+              })
+            }}
             title="Shuffle play"
             className="flex h-11 w-11 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-accent hover:bg-black/45 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -672,10 +694,7 @@ export function ArtistPage({ artistId }: { artistId: string }) {
                 thumb={album.thumbUrl}
                 href={`/album/${album.id}`}
                 prefetch={() => prefetchAlbum(album.id)}
-                onPlay={() => {
-                  const uri = provider?.buildItemUri?.(`/library/metadata/${album.id}`)
-                  if (uri) void playFromUri(uri, false, album.title, `/album/${album.id}`)
-                }}
+                onPlay={() => playAlbum(album.id, album.title)}
                 onContextMenu={ctxMenu("album", album)}
                 dragPayload={{ type: "album", ids: [album.id], label: album.title }}
                 scrollItem
@@ -694,10 +713,7 @@ export function ArtistPage({ artistId }: { artistId: string }) {
                 thumb={album.thumbUrl}
                 href={`/album/${album.id}`}
                 prefetch={() => prefetchAlbum(album.id)}
-                onPlay={() => {
-                  const uri = provider?.buildItemUri?.(`/library/metadata/${album.id}`)
-                  if (uri) void playFromUri(uri, false, album.title, `/album/${album.id}`)
-                }}
+                onPlay={() => playAlbum(album.id, album.title)}
                 onContextMenu={ctxMenu("album", album)}
                 dragPayload={{ type: "album", ids: [album.id], label: album.title }}
                 scrollItem
@@ -723,10 +739,7 @@ export function ArtistPage({ artistId }: { artistId: string }) {
                   thumb={a.thumbUrl}
                   href={`/album/${a.id}`}
                   prefetch={() => prefetchAlbum(a.id)}
-                  onPlay={() => {
-                    const uri = provider?.buildItemUri?.(`/library/metadata/${a.id}`)
-                    if (uri) void playFromUri(uri, false, a.title, `/album/${a.id}`)
-                  }}
+                  onPlay={() => playAlbum(a.id, a.title)}
                   onContextMenu={ctxMenu("album", a)}
                   dragPayload={{ type: "album", ids: [a.id], label: a.title }}
                   scrollItem
@@ -748,7 +761,11 @@ export function ArtistPage({ artistId }: { artistId: string }) {
                 prefetch={() => prefetchArtist(a.id)}
                 onPlay={() => {
                   const uri = provider?.buildItemUri?.(`/library/metadata/${a.id}`)
-                  if (uri) void playFromUri(uri, false, a.title, `/artist/${a.id}`)
+                  if (uri) { void playFromUri(uri, false, a.title, `/artist/${a.id}`); return }
+                  if (!provider) return
+                  void provider.getArtistPopularTracks(a.id).then(tracks => {
+                    if (tracks.length > 0) void playTrack(tracks[0], tracks, a.title, `/artist/${a.id}`)
+                  })
                 }}
                 onContextMenu={ctxMenu("artist", a)}
                 dragPayload={{ type: "artist", ids: [a.id], label: a.title }}

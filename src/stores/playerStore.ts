@@ -843,8 +843,6 @@ export const usePlayerStore = create<PlayerState>()(
 
   playTrack: async (track: MusicTrack, context?: MusicTrack[], contextName?: string | null, contextHref?: string | null) => {
     const provider = getProvider()
-    const itemKey = `/library/metadata/${track.id}`
-    const uri = provider?.buildItemUri ? provider.buildItemUri(itemKey) : itemKey
     const { repeat } = get()
 
     const queue = context ?? [track]
@@ -856,12 +854,18 @@ export const usePlayerStore = create<PlayerState>()(
       contextName: contextName ?? null, contextHref: contextHref ?? null })
 
     try {
-      // Start audio + register server-side queue in parallel
-      const [playQueue] = await Promise.all([
-        provider?.createPlayQueue ? provider.createPlayQueue(uri, false, repeat) : Promise.resolve({ queueId: 0, tracks: [] }),
-        _startPlayback(track, queueIndex, get, set),
-      ])
-      set({ queueId: playQueue.queueId })
+      // If the backend supports server-side play queues, register one alongside playback.
+      // Otherwise just start playback directly.
+      if (provider?.createPlayQueue && provider.buildItemUri) {
+        const uri = provider.buildItemUri(`/library/metadata/${track.id}`)
+        const [playQueue] = await Promise.all([
+          provider.createPlayQueue(uri, false, repeat),
+          _startPlayback(track, queueIndex, get, set),
+        ])
+        set({ queueId: playQueue.queueId })
+      } else {
+        await _startPlayback(track, queueIndex, get, set)
+      }
     } catch (err) {
       console.error("playTrack failed:", err)
     }
@@ -1387,11 +1391,13 @@ export const usePlayerStore = create<PlayerState>()(
         console.error("Audio engine error:", message)
         const { currentTrack } = get()
 
-        // Attempt transcode fallback once per track on playback errors
-        if (currentTrack && _transcodeRetriedTrackId !== currentTrack.id) {
+        // Attempt Plex transcode fallback once per track on playback errors.
+        // This is Plex-specific: it extracts a part key from Plex _providerData
+        // and requests a server-side transcode. Other backends skip this entirely.
+        const provider = getProvider()
+        if (currentTrack && _transcodeRetriedTrackId !== currentTrack.id && provider?.capabilities.streamLevels) {
           _transcodeRetriedTrackId = currentTrack.id
           try {
-            // Extract part key from provider data for transcoding
             const providerData = currentTrack._providerData as { media?: { parts?: { key?: string }[] }[] } | undefined
             const partKey = providerData?.media?.[0]?.parts?.[0]?.key
             if (partKey) {

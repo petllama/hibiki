@@ -65,7 +65,7 @@ export interface LyricLineData {
 }
 
 export interface LyricsSource {
-  id: string           // "plex" | "genius-{songId}"
+  id: string           // "server" | "genius-{songId}"
   label: string        // "Plex" | song title from Genius
   lines: LyricLineData[]
   isSynced: boolean    // true=timed (Plex), false=plain (Genius)

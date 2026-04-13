@@ -1,4 +1,4 @@
-import type { BackendDefinition } from "../types"
+import type { BackendDefinition, BackendConnectionSnapshot } from "../types"
 import { useConnectionStore } from "./connectionStore"
 import { PlexSettings } from "./settings"
 
@@ -42,4 +42,12 @@ export const plexBackend: BackendDefinition = {
   useIsConnected: () => useConnectionStore(s => s.isConnected),
   loadAndConnect: () => useConnectionStore.getState().loadAndConnect(),
   disconnectAndClear: () => useConnectionStore.getState().disconnectAndClear(),
+  getConnectionSnapshot: (): BackendConnectionSnapshot => {
+    const s = useConnectionStore.getState()
+    return { isConnected: s.isConnected, isLoading: s.isLoading, libraryKey: s.libraryKey }
+  },
+  subscribeConnection: (listener) =>
+    useConnectionStore.subscribe((s) =>
+      listener({ isConnected: s.isConnected, isLoading: s.isLoading, libraryKey: s.libraryKey })
+    ),
 }

@@ -129,9 +129,10 @@ export function makeDragPayload(item: MusicItem): DragPayload | undefined {
 export function Home() {
   // Granular selector: only re-render when recentlyAdded or hubs actually change.
   // Changes to playlistItemsCache (from background prefetch) do NOT trigger re-renders here.
-  const { recentlyAdded, hubs } = useLibraryStore(useShallow(s => ({
+  const { recentlyAdded, hubs, hasFetchedHome } = useLibraryStore(useShallow(s => ({
     recentlyAdded: s.recentlyAdded,
     hubs: s.hubs,
+    hasFetchedHome: s._recentlyAddedFetchedAt !== null || s._hubsFetchedAt !== null,
   })))
   const { isConnected, isLoading: isConnecting } = useConnectionStore(
     useShallow(s => ({ isConnected: s.isConnected, isLoading: s.isLoading }))
@@ -156,6 +157,7 @@ export function Home() {
   )
 
   const hasRealData = recentlyAdded.length > 0 || hubs.length > 0
+  const fetchedButEmpty = hasFetchedHome && !hasRealData
 
   const { mixesItems, mixesTitle } = useMemo(() => {
     const mh = hubs.filter(h => h.identifier?.startsWith("music.mixes"))
@@ -212,9 +214,11 @@ export function Home() {
   if (!hasRealData) {
     const message = isConnecting
       ? "Connecting…"
-      : isConnected
-        ? "Loading your library…"
-        : "Not connected. Go to Settings to connect."
+      : !isConnected
+        ? "Not connected. Go to Settings to connect."
+        : fetchedButEmpty
+          ? "Your library appears to be empty."
+          : "Loading your library…"
     return (
       <div className="space-y-8">
         <div className="text-gray-400 text-sm">{message}</div>

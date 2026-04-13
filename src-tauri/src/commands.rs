@@ -1499,18 +1499,26 @@ pub fn db_kv_set(db: State<'_, DbState>, key: String, value: String) -> Result<(
 // ---- Info ----
 
 #[tauri::command]
-pub fn db_get_info(db: State<'_, DbState>) -> Result<DbInfo, String> {
+pub fn db_get_info(db: State<'_, DbState>, backend: String) -> Result<DbInfo, String> {
     let conn = db_conn!(db);
     Ok(DbInfo {
-        artist_count: db::artists::count(&conn)?,
-        album_count: db::albums::count(&conn)?,
-        track_count: db::tracks::count(&conn)?,
-        playlist_count: db::playlists::count(&conn)?,
+        artist_count: db::artists::count(&conn, &backend)?,
+        album_count: db::albums::count(&conn, &backend)?,
+        track_count: db::tracks::count(&conn, &backend)?,
+        playlist_count: db::playlists::count(&conn, &backend)?,
         tag_count: conn
-            .query_row("SELECT COUNT(*) FROM tags", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM tags WHERE backend = ?1",
+                [&backend],
+                |r| r.get(0),
+            )
             .map_err(|e| format!("count error: {e}"))?,
         play_history_count: conn
-            .query_row("SELECT COUNT(*) FROM play_history", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM play_history WHERE backend = ?1",
+                [&backend],
+                |r| r.get(0),
+            )
             .map_err(|e| format!("count error: {e}"))?,
     })
 }
@@ -1518,13 +1526,19 @@ pub fn db_get_info(db: State<'_, DbState>) -> Result<DbInfo, String> {
 // ---- Artists ----
 
 #[tauri::command]
-pub fn db_upsert_artist(db: State<'_, DbState>, artist: Artist) -> Result<(), String> {
+pub fn db_upsert_artist(
+    db: State<'_, DbState>,
+    artist: db::artists::ArtistRow,
+) -> Result<(), String> {
     let conn = db_conn!(db);
     db::artists::upsert(&conn, &artist)
 }
 
 #[tauri::command]
-pub fn db_upsert_artists(db: State<'_, DbState>, artists: Vec<Artist>) -> Result<(), String> {
+pub fn db_upsert_artists(
+    db: State<'_, DbState>,
+    artists: Vec<db::artists::ArtistRow>,
+) -> Result<(), String> {
     let conn = db_conn!(db);
     db::artists::upsert_bulk(&conn, &artists)
 }
@@ -1532,38 +1546,46 @@ pub fn db_upsert_artists(db: State<'_, DbState>, artists: Vec<Artist>) -> Result
 #[tauri::command]
 pub fn db_get_artist(
     db: State<'_, DbState>,
-    id: i64,
+    backend: String,
+    id: String,
 ) -> Result<Option<db::artists::ArtistRow>, String> {
     let conn = db_conn!(db);
-    db::artists::get(&conn, id)
+    db::artists::get(&conn, &backend, &id)
 }
 
 #[tauri::command]
 pub fn db_search_artists(
     db: State<'_, DbState>,
+    backend: String,
     query: String,
     limit: i64,
 ) -> Result<Vec<db::artists::ArtistRow>, String> {
     let conn = db_conn!(db);
-    db::artists::search(&conn, &query, limit)
+    db::artists::search(&conn, &backend, &query, limit)
 }
 
 #[tauri::command]
-pub fn db_get_artist_count(db: State<'_, DbState>) -> Result<i64, String> {
+pub fn db_get_artist_count(db: State<'_, DbState>, backend: String) -> Result<i64, String> {
     let conn = db_conn!(db);
-    db::artists::count(&conn)
+    db::artists::count(&conn, &backend)
 }
 
 // ---- Albums ----
 
 #[tauri::command]
-pub fn db_upsert_album(db: State<'_, DbState>, album: Album) -> Result<(), String> {
+pub fn db_upsert_album(
+    db: State<'_, DbState>,
+    album: db::albums::AlbumRow,
+) -> Result<(), String> {
     let conn = db_conn!(db);
     db::albums::upsert(&conn, &album)
 }
 
 #[tauri::command]
-pub fn db_upsert_albums(db: State<'_, DbState>, albums: Vec<Album>) -> Result<(), String> {
+pub fn db_upsert_albums(
+    db: State<'_, DbState>,
+    albums: Vec<db::albums::AlbumRow>,
+) -> Result<(), String> {
     let conn = db_conn!(db);
     db::albums::upsert_bulk(&conn, &albums)
 }
@@ -1571,47 +1593,56 @@ pub fn db_upsert_albums(db: State<'_, DbState>, albums: Vec<Album>) -> Result<()
 #[tauri::command]
 pub fn db_get_album(
     db: State<'_, DbState>,
-    id: i64,
+    backend: String,
+    id: String,
 ) -> Result<Option<db::albums::AlbumRow>, String> {
     let conn = db_conn!(db);
-    db::albums::get(&conn, id)
+    db::albums::get(&conn, &backend, &id)
 }
 
 #[tauri::command]
 pub fn db_search_albums(
     db: State<'_, DbState>,
+    backend: String,
     query: String,
     limit: i64,
 ) -> Result<Vec<db::albums::AlbumRow>, String> {
     let conn = db_conn!(db);
-    db::albums::search(&conn, &query, limit)
+    db::albums::search(&conn, &backend, &query, limit)
 }
 
 #[tauri::command]
 pub fn db_get_albums_by_artist(
     db: State<'_, DbState>,
-    artist_id: i64,
+    backend: String,
+    artist_id: String,
 ) -> Result<Vec<db::albums::AlbumRow>, String> {
     let conn = db_conn!(db);
-    db::albums::get_by_artist(&conn, artist_id)
+    db::albums::get_by_artist(&conn, &backend, &artist_id)
 }
 
 #[tauri::command]
-pub fn db_get_album_count(db: State<'_, DbState>) -> Result<i64, String> {
+pub fn db_get_album_count(db: State<'_, DbState>, backend: String) -> Result<i64, String> {
     let conn = db_conn!(db);
-    db::albums::count(&conn)
+    db::albums::count(&conn, &backend)
 }
 
 // ---- Tracks ----
 
 #[tauri::command]
-pub fn db_upsert_track(db: State<'_, DbState>, track: Track) -> Result<(), String> {
+pub fn db_upsert_track(
+    db: State<'_, DbState>,
+    track: db::tracks::TrackRow,
+) -> Result<(), String> {
     let conn = db_conn!(db);
     db::tracks::upsert(&conn, &track)
 }
 
 #[tauri::command]
-pub fn db_upsert_tracks(db: State<'_, DbState>, tracks: Vec<Track>) -> Result<(), String> {
+pub fn db_upsert_tracks(
+    db: State<'_, DbState>,
+    tracks: Vec<db::tracks::TrackRow>,
+) -> Result<(), String> {
     let conn = db_conn!(db);
     db::tracks::upsert_bulk(&conn, &tracks)
 }
@@ -1619,35 +1650,38 @@ pub fn db_upsert_tracks(db: State<'_, DbState>, tracks: Vec<Track>) -> Result<()
 #[tauri::command]
 pub fn db_get_track(
     db: State<'_, DbState>,
-    id: i64,
+    backend: String,
+    id: String,
 ) -> Result<Option<db::tracks::TrackRow>, String> {
     let conn = db_conn!(db);
-    db::tracks::get(&conn, id)
+    db::tracks::get(&conn, &backend, &id)
 }
 
 #[tauri::command]
 pub fn db_search_tracks(
     db: State<'_, DbState>,
+    backend: String,
     query: String,
     limit: i64,
 ) -> Result<Vec<db::tracks::TrackRow>, String> {
     let conn = db_conn!(db);
-    db::tracks::search(&conn, &query, limit)
+    db::tracks::search(&conn, &backend, &query, limit)
 }
 
 #[tauri::command]
 pub fn db_get_tracks_by_album(
     db: State<'_, DbState>,
-    album_id: i64,
+    backend: String,
+    album_id: String,
 ) -> Result<Vec<db::tracks::TrackRow>, String> {
     let conn = db_conn!(db);
-    db::tracks::get_by_album(&conn, album_id)
+    db::tracks::get_by_album(&conn, &backend, &album_id)
 }
 
 #[tauri::command]
-pub fn db_get_track_count(db: State<'_, DbState>) -> Result<i64, String> {
+pub fn db_get_track_count(db: State<'_, DbState>, backend: String) -> Result<i64, String> {
     let conn = db_conn!(db);
-    db::tracks::count(&conn)
+    db::tracks::count(&conn, &backend)
 }
 
 // ---- Playlists ----
@@ -1655,7 +1689,7 @@ pub fn db_get_track_count(db: State<'_, DbState>) -> Result<i64, String> {
 #[tauri::command]
 pub fn db_upsert_playlists(
     db: State<'_, DbState>,
-    playlists: Vec<Playlist>,
+    playlists: Vec<db::playlists::PlaylistRow>,
 ) -> Result<(), String> {
     let conn = db_conn!(db);
     db::playlists::upsert_bulk(&conn, &playlists)
@@ -1664,30 +1698,29 @@ pub fn db_upsert_playlists(
 #[tauri::command]
 pub fn db_get_playlists(
     db: State<'_, DbState>,
+    backend: String,
 ) -> Result<Vec<db::playlists::PlaylistRow>, String> {
     let conn = db_conn!(db);
-    db::playlists::get_all(&conn)
+    db::playlists::get_all(&conn, &backend)
 }
 
 #[tauri::command]
 pub fn db_add_playlist_track(
     db: State<'_, DbState>,
-    playlist_id: i64,
-    track_id: i64,
-    position: i64,
-    added_by: String,
+    row: db::playlists::PlaylistTrackRow,
 ) -> Result<(), String> {
     let conn = db_conn!(db);
-    db::playlists::add_track(&conn, playlist_id, track_id, position, None, &added_by)
+    db::playlists::add_track(&conn, &row)
 }
 
 #[tauri::command]
 pub fn db_get_playlist_tracks(
     db: State<'_, DbState>,
-    playlist_id: i64,
+    backend: String,
+    playlist_id: String,
 ) -> Result<Vec<db::playlists::PlaylistTrackRow>, String> {
     let conn = db_conn!(db);
-    db::playlists::get_tracks(&conn, playlist_id)
+    db::playlists::get_tracks(&conn, &backend, &playlist_id)
 }
 
 // ---------------------------------------------------------------------------

@@ -145,7 +145,7 @@ export function AlbumPage({ albumId }: { albumId: string }) {
   const appleCover  = itunesData?.cover_url ? buildImageUrl("album", albumId, itunesData.cover_url, album.title, album.artistName) : null
   let thumbUrl: string | null = null
   for (const src of priority) {
-    if (src === "plex"   && plexThumb)   { thumbUrl = plexThumb;   break }
+    if (src === "server"   && plexThumb)   { thumbUrl = plexThumb;   break }
     if (src === "deezer" && deezerCover) { thumbUrl = deezerCover; break }
     if (src === "apple"  && appleCover)  { thumbUrl = appleCover;  break }
   }
@@ -166,12 +166,12 @@ export function AlbumPage({ albumId }: { albumId: string }) {
   let displayWiki: string | undefined
   for (const src of priority) {
     if (src === "lastfm" && lastfmData?.wiki) { displayWiki = lastfmData.wiki; break }
-    if (src === "plex"   && album.summary)    { displayWiki = album.summary;   break }
+    if (src === "server"   && album.summary)    { displayWiki = album.summary;   break }
   }
 
   // Merge tags in priority order; Plex tags always valid; external tags filtered.
   const tagsBySource: Record<string, string[]> = {
-    plex:   plexTags,
+    server: plexTags,
     lastfm: (lastfmData?.tags ?? []).filter(t => plexTagSet.has(t.toLowerCase())),
     deezer: (deezerData?.genres ?? []).filter(g => plexTagSet.has(g.toLowerCase())),
     apple:  itunesData?.genre && plexTagSet.has(itunesData.genre.toLowerCase()) ? [itunesData.genre] : [],

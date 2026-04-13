@@ -59,10 +59,14 @@ function fmt(v: string | number | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 function TrackContent({ track }: { track: MusicTrack }) {
-  const plex = track._providerData as any
-  const media = plex?.media?.[0]
+  const pd = track._providerData as any
+  // Plex-specific nested media structure
+  const media = pd?.media?.[0]
   const part = media?.parts?.[0]
   const streams = part?.streams ?? []
+  // Subsonic-specific fields
+  const subsonicPath = pd?.path as string | undefined
+  const subsonicSuffix = pd?.suffix as string | undefined
 
   return (
     <>
@@ -80,14 +84,14 @@ function TrackContent({ track }: { track: MusicTrack }) {
       </Section>
 
       <Section title="File Info">
-        <Row label="file" value={part?.file ?? "---"} />
-        <Row label="container" value={fmt(media?.container)} />
+        <Row label="file" value={part?.file ?? subsonicPath ?? "---"} />
+        <Row label="container" value={fmt(media?.container ?? subsonicSuffix)} />
         <Row label="codec" value={fmt(track.codec)} />
         <Row label="bitrate" value={track.bitrate ? `${track.bitrate} kbps` : "---"} />
         <Row label="channels" value={fmt(track.channels)} />
         <Row label="bitDepth" value={fmt(track.bitDepth)} />
         <Row label="samplingRate" value={track.samplingRate ? `${track.samplingRate} Hz` : "---"} />
-        <Row label="size" value={part?.size ? `${(part.size / 1024 / 1024).toFixed(1)} MB` : "---"} />
+        <Row label="size" value={part?.size ? `${(part.size / 1024 / 1024).toFixed(1)} MB` : pd?.size ? `${(pd.size / 1024 / 1024).toFixed(1)} MB` : "---"} />
       </Section>
 
       {streams.length > 0 && (

@@ -35,8 +35,8 @@ import "./i18n" // Initialize i18n on app load
 function App() {
   const debugPanelOpen = useDebugPanelStore(s => s.open)
   const { hotkeyHelpOpen, setHotkeyHelpOpen } = useGlobalHotkeys()
-  const { isConnected, musicSectionId, isLoading, loadAndConnect } = useConnectionStore(
-    useShallow(s => ({ isConnected: s.isConnected, musicSectionId: s.musicSectionId, isLoading: s.isLoading, loadAndConnect: s.loadAndConnect }))
+  const { isConnected, libraryKey, isLoading, loadAndConnect } = useConnectionStore(
+    useShallow(s => ({ isConnected: s.isConnected, libraryKey: s.libraryKey, isLoading: s.isLoading, loadAndConnect: s.loadAndConnect }))
   )
   const { fetchPlaylists, fetchRecentlyAdded, fetchHubs, fetchTags, prefetchAllPlaylists, prefetchMixTracks } = useLibraryStore(
     useShallow(s => ({ fetchPlaylists: s.fetchPlaylists, fetchRecentlyAdded: s.fetchRecentlyAdded, fetchHubs: s.fetchHubs, fetchTags: s.fetchTags, prefetchAllPlaylists: s.prefetchAllPlaylists, prefetchMixTracks: s.prefetchMixTracks }))
@@ -56,10 +56,10 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (isConnected && musicSectionId !== null) {
+    if (isConnected && libraryKey !== null) {
       // Fetch all home-page data in parallel, THEN start background prefetch.
       // Starting prefetch early was competing with fetchHubs/fetchRecentlyAdded
-      // for Plex server connections, causing hubs to silently fail.
+      // for server connections, causing hubs to silently fail.
       void Promise.all([
         fetchPlaylists(),
         fetchRecentlyAdded(50),
@@ -70,7 +70,7 @@ function App() {
         void prefetchMixTracks()
       })
     }
-  }, [isConnected, musicSectionId])
+  }, [isConnected, libraryKey])
 
   useEffect(() => {
     if (!isLoading && !isConnected && location !== "/settings") {
