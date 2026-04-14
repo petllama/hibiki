@@ -48,21 +48,14 @@ export function RecentlyPlayedPage() {
   return (
     <div className="pb-12">
       <div className="flex flex-row items-end p-8">
-        <div className="flex w-60 h-60 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-amber-700 to-orange-500 shadow-2xl">
-          <svg viewBox="0 0 24 24" width="80" height="80" fill="white">
+        <div className="flex w-32 h-32 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-amber-700 to-orange-500 shadow-2xl">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="white">
             <path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
           </svg>
         </div>
-        <div className="pl-6 flex flex-col justify-between flex-1 h-60 min-w-0">
-          <div>
-            <div className="whitespace-nowrap text-[76px] font-black leading-none">
-              Recently Played
-            </div>
-            <p className="mt-2 max-w-xl select-text text-sm text-gray-400">
-              Albums you've listened to recently.
-            </p>
-          </div>
-          <p className="text-sm text-gray-400">
+        <div className="pl-6 flex flex-col justify-end flex-1 h-32 min-w-0">
+          <div className="text-3xl font-black leading-tight">Recently Played</div>
+          <p className="mt-1 text-sm text-gray-400">
             {albums.length} {albums.length === 1 ? "album" : "albums"}
           </p>
         </div>

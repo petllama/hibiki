@@ -47,21 +47,14 @@ export function AllAlbumsPage() {
   return (
     <div className="pb-12">
       <div className="flex flex-row items-end p-8">
-        <div className="flex w-60 h-60 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-cyan-700 to-blue-500 shadow-2xl">
-          <svg viewBox="0 0 24 24" width="80" height="80" fill="white">
+        <div className="flex w-32 h-32 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-cyan-700 to-blue-500 shadow-2xl">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="white">
             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
           </svg>
         </div>
-        <div className="pl-6 flex flex-col justify-between flex-1 h-60 min-w-0">
-          <div>
-            <div className="whitespace-nowrap text-[76px] font-black leading-none">
-              All Albums
-            </div>
-            <p className="mt-2 max-w-xl select-text text-sm text-gray-400">
-              Every album in your library.
-            </p>
-          </div>
-          <p className="text-sm text-gray-400">
+        <div className="pl-6 flex flex-col justify-end flex-1 h-32 min-w-0">
+          <div className="text-3xl font-black leading-tight">All Albums</div>
+          <p className="mt-1 text-sm text-gray-400">
             {albums.length} {albums.length === 1 ? "album" : "albums"}
           </p>
         </div>

@@ -47,21 +47,14 @@ export function AllArtistsPage() {
   return (
     <div className="pb-12">
       <div className="flex flex-row items-end p-8">
-        <div className="flex w-60 h-60 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-indigo-700 to-violet-500 shadow-2xl">
-          <svg viewBox="0 0 24 24" width="80" height="80" fill="white">
+        <div className="flex w-32 h-32 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-indigo-700 to-violet-500 shadow-2xl">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="white">
             <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
           </svg>
         </div>
-        <div className="pl-6 flex flex-col justify-between flex-1 h-60 min-w-0">
-          <div>
-            <div className="whitespace-nowrap text-[76px] font-black leading-none">
-              All Artists
-            </div>
-            <p className="mt-2 max-w-xl select-text text-sm text-gray-400">
-              Every artist in your library.
-            </p>
-          </div>
-          <p className="text-sm text-gray-400">
+        <div className="pl-6 flex flex-col justify-end flex-1 h-32 min-w-0">
+          <div className="text-3xl font-black leading-tight">All Artists</div>
+          <p className="mt-1 text-sm text-gray-400">
             {artists.length} {artists.length === 1 ? "artist" : "artists"}
           </p>
         </div>
