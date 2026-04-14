@@ -12,20 +12,75 @@ use crossbeam_channel::{bounded, Sender};
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 #[cfg(target_os = "windows")]
 use tauri::Manager;
 use tauri::{AppHandle, Emitter, Runtime};
 
-fn epoch_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64
+/// How long after waking from sleep to keep suppressing media events (ms).
+const WAKE_SUPPRESS_MS: u64 = 5000;
+
+/// Spawn a thread that listens for `PrepareForSleep` on the system D-Bus.
+/// Sets `suppress` to true when the system is going to sleep, and keeps it
+/// true for a few seconds after waking so stale MPRIS events are ignored.
+#[cfg(target_os = "linux")]
+fn spawn_sleep_listener(suppress: Arc<AtomicBool>) {
+    std::thread::Builder::new()
+        .name("sleep-listener".into())
+        .spawn(move || {
+            let conn = match dbus::blocking::Connection::new_system() {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!("Failed to connect to system D-Bus for sleep detection: {e}");
+                    return;
+                }
+            };
+
+            // Subscribe to the PrepareForSleep signal from logind
+            let proxy = conn.with_proxy(
+                "org.freedesktop.login1",
+                "/org/freedesktop/login1",
+                Duration::from_secs(5),
+            );
+            use dbus::message::MatchRule;
+            let rule = MatchRule::new_signal("org.freedesktop.login1.Manager", "PrepareForSleep");
+            if let Err(e) = conn.add_match(rule, move |_: (), _conn, msg| {
+                // PrepareForSleep(bool): true = going to sleep, false = waking up
+                if let Some(going_to_sleep) = msg.get1::<bool>() {
+                    if going_to_sleep {
+                        tracing::debug!("system going to sleep — suppressing media events");
+                        suppress.store(true, Ordering::Relaxed);
+                    } else {
+                        tracing::debug!("system waking — suppressing media events for {}ms", WAKE_SUPPRESS_MS);
+                        // Keep suppress=true, clear it after a delay
+                        let suppress_clone = suppress.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(WAKE_SUPPRESS_MS));
+                            suppress_clone.store(false, Ordering::Relaxed);
+                            tracing::debug!("sleep suppress window ended");
+                        });
+                    }
+                }
+                true // keep the match active
+            }) {
+                tracing::warn!("Failed to subscribe to PrepareForSleep: {e}");
+                return;
+            }
+
+            // Block forever processing D-Bus messages
+            loop {
+                conn.process(Duration::from_secs(60)).ok();
+            }
+        })
+        .ok();
 }
 
-/// How long after a user-initiated pause to suppress incoming Play/Toggle
-/// events from the OS (e.g. MPRIS signals during system suspend).
-const PAUSE_SUPPRESS_MS: u64 = 3000;
+#[cfg(not(target_os = "linux"))]
+fn spawn_sleep_listener(_suppress: Arc<AtomicBool>) {
+    // No-op on non-Linux platforms
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -75,6 +130,11 @@ impl MediaSessionState {
         #[cfg(not(target_os = "windows"))]
         let hwnd_isize: isize = 0;
 
+        // Sleep/wake event suppression flag
+        let sleep_suppress = Arc::new(AtomicBool::new(false));
+        spawn_sleep_listener(sleep_suppress.clone());
+        let suppress_for_cb = sleep_suppress;
+
         std::thread::Builder::new()
             .name("media-session".into())
             .spawn(move || {
@@ -98,11 +158,6 @@ impl MediaSessionState {
                     }
                 };
 
-                // Timestamp of last user-initiated pause — used to suppress
-                // spurious Play/Toggle events from the OS during system suspend.
-                let last_pause_at = Arc::new(AtomicU64::new(0));
-                let last_pause_for_cb = last_pause_at.clone();
-
                 // Forward OS media-key events to the frontend.
                 controls
                     .attach(move |event: MediaControlEvent| {
@@ -110,24 +165,11 @@ impl MediaSessionState {
                             MediaControlEvent::Play
                             | MediaControlEvent::Pause
                             | MediaControlEvent::Toggle => {
-                                // Suppress Play/Toggle if we just paused — prevents
-                                // system suspend from toggling playback back on.
-                                let since_pause = epoch_ms().saturating_sub(
-                                    last_pause_for_cb.load(Ordering::Relaxed),
-                                );
-                                if since_pause < PAUSE_SUPPRESS_MS {
-                                    match event {
-                                        MediaControlEvent::Pause => {
-                                            // Always allow explicit Pause
-                                            app_handle.emit("media://play-pause", ()).ok();
-                                        }
-                                        _ => {
-                                            tracing::debug!("suppressing media Play/Toggle ({}ms after pause)", since_pause);
-                                        }
-                                    }
-                                } else {
-                                    app_handle.emit("media://play-pause", ()).ok();
+                                if suppress_for_cb.load(Ordering::Relaxed) {
+                                    tracing::debug!("suppressing media event during sleep/wake");
+                                    return;
                                 }
+                                app_handle.emit("media://play-pause", ()).ok();
                             }
                             MediaControlEvent::Next => {
                                 app_handle.emit("media://next", ()).ok();
@@ -178,7 +220,6 @@ impl MediaSessionState {
                                 .ok();
                         }
                         MediaUpdate::Paused { position_ms } => {
-                            last_pause_at.store(epoch_ms(), Ordering::Relaxed);
                             controls
                                 .set_playback(MediaPlayback::Paused {
                                     progress: Some(MediaPosition(Duration::from_millis(
