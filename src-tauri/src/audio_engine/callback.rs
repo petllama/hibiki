@@ -427,6 +427,7 @@ impl AudioCallbackState {
             && self.deck_mgr.active_deck().has_started_playing;
 
         let should_xfade = has_active
+            && !self.paused
             && self.deck_mgr.pending_deck().loaded
             && !self
                 .deck_mgr
