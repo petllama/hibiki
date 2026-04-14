@@ -19,6 +19,9 @@ import { InternetRadioPage } from "./Pages/InternetRadio"
 import { PodcastsPage } from "./Pages/Podcasts"
 import { PodcastDetailPage } from "./Pages/PodcastDetail"
 import { Playlists } from "./Pages/Playlists"
+import { AllArtistsPage } from "./Pages/AllArtists"
+import { AllAlbumsPage } from "./Pages/AllAlbums"
+import { RecentlyPlayedPage } from "./Pages/RecentlyPlayed"
 // MixPage uses module-level selectMix() state — no URL param needed
 import clsx from "clsx"
 import { TopBar } from "./TopBar"
@@ -179,6 +182,18 @@ export function Page() {
           {(params: { hubId?: string }) => (
             <HubPage hubId={decodeURIComponent(params.hubId ?? "")} />
           )}
+        </Route>
+
+        <Route path="/browse/artists" key="all-artists">
+          <AllArtistsPage />
+        </Route>
+
+        <Route path="/browse/albums" key="all-albums">
+          <AllAlbumsPage />
+        </Route>
+
+        <Route path="/recently-played" key="recently-played">
+          <RecentlyPlayedPage />
         </Route>
 
         <Route path="/recently-added" key="recently-added">

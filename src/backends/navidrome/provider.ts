@@ -406,6 +406,13 @@ export class NavidromeProvider implements MusicProvider {
     return { items: mapped, total: mapped.length }
   }
 
+  async getRecentlyPlayed(limit?: number): Promise<MusicAlbum[]> {
+    const albums = await api.subsonicGetAlbumList("recent", limit ?? 50)
+    await this.preResolveCoverArts(albums.map(a => a.coverArt))
+    const img = this.imgWithCache()
+    return albums.map(a => subsonicAlbumToMusicAlbum(a, img))
+  }
+
   // ---------------------------------------------------------------------------
   // Now Playing — delegates to Tauri media session (same as Plex)
   // ---------------------------------------------------------------------------

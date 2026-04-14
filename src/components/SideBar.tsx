@@ -237,7 +237,7 @@ export function SideBar({ onCreatePlaylist }: { onCreatePlaylist: () => void }) 
       <ul className="flex-shrink-0 pt-1 text-sm font-semibold">
         {routes1.filter(i => i.href !== "/stations" || hasStations).map((i, index) => {
           const isActive = i.href === "/library"
-            ? location === "/library" || location.startsWith("/collection/")
+            ? location === "/library" || location.startsWith("/collection/") || location.startsWith("/browse/") || location === "/recently-played" || location === "/recently-added"
             : location === i.href
           return (
             <li key={`${i.href}-${index}`}>
@@ -411,6 +411,10 @@ const routes1 = [
 ]
 
 const librarySubLinks = [
+  { title: "All Artists", href: "/browse/artists" },
+  { title: "All Albums", href: "/browse/albums" },
+  { title: "Recently Played", href: "/recently-played" },
+  { title: "Recently Added", href: "/recently-added" },
   { title: "Playlists", href: "/collection/playlists" },
   { title: "Liked Songs", href: "/collection/tracks" },
   { title: "Liked Albums", href: "/collection/albums" },

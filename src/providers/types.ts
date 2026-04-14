@@ -140,6 +140,7 @@ export interface MusicProvider {
   getAllArtists?(offset?: number, limit?: number): Promise<PagedResult<MusicArtist>>
   getAllAlbums?(offset?: number, limit?: number): Promise<PagedResult<MusicAlbum>>
   getAllTracks?(offset?: number, limit?: number): Promise<PagedResult<MusicTrack>>
+  getRecentlyPlayed?(limit?: number): Promise<MusicAlbum[]>
 
   // --- URI builders (needed by stores for queue creation) ---
   buildItemUri?(itemKey: string): string
