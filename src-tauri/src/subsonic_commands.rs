@@ -451,7 +451,9 @@ async fn fetch_track_rows(client: &crate::subsonic::SubsonicClient) -> Result<Ve
 fn write_artists(conn: &rusqlite::Connection, rows: &[ArtistRow]) -> Result<SyncResult, String> {
     let tx = conn.unchecked_transaction().map_err(|e| format!("begin tx: {e}"))?;
     let deleted = db::artists::delete_all(&tx, BACKEND)?;
-    db::artists::upsert_bulk(&tx, rows)?;
+    for row in rows {
+        db::artists::upsert(&tx, row)?;
+    }
     tx.commit().map_err(|e| format!("commit: {e}"))?;
     let synced = rows.len() as i64;
     info!("[sync:artists] written — synced {synced}, deleted {deleted}");
@@ -461,7 +463,9 @@ fn write_artists(conn: &rusqlite::Connection, rows: &[ArtistRow]) -> Result<Sync
 fn write_albums(conn: &rusqlite::Connection, rows: &[AlbumRow]) -> Result<SyncResult, String> {
     let tx = conn.unchecked_transaction().map_err(|e| format!("begin tx: {e}"))?;
     let deleted = db::albums::delete_all(&tx, BACKEND)?;
-    db::albums::upsert_bulk(&tx, rows)?;
+    for row in rows {
+        db::albums::upsert(&tx, row)?;
+    }
     tx.commit().map_err(|e| format!("commit: {e}"))?;
     let synced = rows.len() as i64;
     info!("[sync:albums] written — synced {synced}, deleted {deleted}");
@@ -471,7 +475,9 @@ fn write_albums(conn: &rusqlite::Connection, rows: &[AlbumRow]) -> Result<SyncRe
 fn write_tracks(conn: &rusqlite::Connection, rows: &[TrackRow]) -> Result<SyncResult, String> {
     let tx = conn.unchecked_transaction().map_err(|e| format!("begin tx: {e}"))?;
     let deleted = db::tracks::delete_all(&tx, BACKEND)?;
-    db::tracks::upsert_bulk(&tx, rows)?;
+    for row in rows {
+        db::tracks::upsert(&tx, row)?;
+    }
     tx.commit().map_err(|e| format!("commit: {e}"))?;
     let synced = rows.len() as i64;
     info!("[sync:tracks] written — synced {synced}, deleted {deleted}");

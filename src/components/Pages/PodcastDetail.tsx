@@ -8,12 +8,12 @@ import { UltraBlur } from "../UltraBlur"
 import type { PodcastDetail, PodcastEpisode } from "../../backends/podcast/api"
 
 export function PodcastDetailPage({ feedUrl }: { feedUrl: string }) {
-  const { getFeed, subscribe, unsubscribe, isSubscribed, getEpisodeProgress, isEpisodeCompleted } =
+  const { getFeed, subscribe, unsubscribe, subscriptions, getEpisodeProgress, isEpisodeCompleted } =
     usePodcastStore(useShallow(s => ({
       getFeed: s.getFeed,
       subscribe: s.subscribe,
       unsubscribe: s.unsubscribe,
-      isSubscribed: s.isSubscribed,
+      subscriptions: s.subscriptions,
       getEpisodeProgress: s.getEpisodeProgress,
       isEpisodeCompleted: s.isEpisodeCompleted,
     })))
@@ -26,7 +26,7 @@ export function PodcastDetailPage({ feedUrl }: { feedUrl: string }) {
   const [podcast, setPodcast] = useState<PodcastDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [descExpanded, setDescExpanded] = useState(false)
-  const subscribed = isSubscribed(feedUrl)
+  const subscribed = subscriptions.some(s => s.feedUrl === feedUrl)
 
   useEffect(() => {
     setIsLoading(true)

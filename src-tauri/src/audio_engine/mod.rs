@@ -42,7 +42,16 @@ use self::output::CpalOutput;
 use self::types::{DeckId, EngineState, TrackMeta};
 use self::visualizer::VisualizerProcessor;
 
-use crate::commands::PlexState;
+use once_cell::sync::Lazy;
+
+/// Shared reqwest client for audio streaming — works with any backend since
+/// both Plex and Subsonic URLs are fully authenticated.
+static STREAM_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
+    reqwest::Client::builder()
+        .user_agent("Hibiki/1.0")
+        .build()
+        .expect("failed to build stream HTTP client")
+});
 
 /// The main audio engine handle, held as Tauri managed state.
 ///
@@ -883,7 +892,7 @@ fn fetch_and_decode_incremental(
     url: &str,
     rating_key: i64,
     cache: &Arc<AudioCache>,
-    app_handle: &tauri::AppHandle,
+    _app_handle: &tauri::AppHandle,
     rt: &tokio::runtime::Handle,
     device_rate: u32,
     device_channels: u16,
@@ -905,37 +914,22 @@ fn fetch_and_decode_incremental(
     }
 
     // ---- Cache MISS: stream from HTTP, tee to disk ----
-    debug!(rating_key, "cache miss — streaming from Plex");
+    debug!(rating_key, "cache miss — streaming from server");
 
     use self::deck::streaming::{SharedBuffer, StreamingReader};
-    use tauri::Manager;
 
-    let app = app_handle.clone();
     let url_owned = url.to_string();
     let ext = cache::extract_extension(url);
     let cache_writer = cache.begin_write(rating_key, &ext).ok();
     let cache_for_task = cache.clone();
 
     let shared_buf = rt.block_on(async {
-        let client = {
-            let plex_state = app.state::<PlexState>();
-            let guard = plex_state.0.lock().await;
-            guard
-                .as_ref()
-                .ok_or_else(|| "not connected to Plex".to_string())?
-                .clone()
-        };
-
-        let (fetch_lock, media_client, token) = client.media_fetch_parts();
-
         let shared = SharedBuffer::new(None);
         let shared_w = shared.clone();
 
         tauri::async_runtime::spawn(async move {
-            let _guard = fetch_lock.lock().await;
-            let response = match media_client
+            let response = match STREAM_CLIENT
                 .get(&url_owned)
-                .header("X-Plex-Token", &token)
                 .send()
                 .await
             {
