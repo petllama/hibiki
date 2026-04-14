@@ -322,12 +322,12 @@ fn control_thread_main(
                     // Check if the preload was truncated (stream error during download)
                     let preload_broken = atomics.preload_error_rk.load(Ordering::Relaxed) == meta.rating_key;
                     if already_active {
-                        eprintln!("[audio-engine] track {} already active — sending resume", meta.rating_key);
+                        info!(rating_key = meta.rating_key, "track already active, sending resume");
                         let _ = audio_cmd_tx.send(AudioCommand::Resume);
                         pending_rating_key = 0;
                     // If the pending deck already has this track preloaded, just transition
                     } else if pending_rating_key == meta.rating_key && pending_rating_key != 0 && !preload_broken {
-                        eprintln!("[audio-engine] using preloaded deck for {}, transitioning + resume", meta.rating_key);
+                        info!(rating_key = meta.rating_key, "using preloaded deck, transitioning + resume");
                         cache_ramps(&meta, &audio_cmd_tx);
                         let was_paused = atomics.get_state() == EngineState::Paused;
                         let _ = audio_cmd_tx.send(AudioCommand::TransitionToActive { user_skip: true });
@@ -508,7 +508,7 @@ fn handle_play(
     device_rate: u32,
     device_channels: u16,
 ) {
-    eprintln!("[audio-engine] handle_play: rating_key={}, deck={:?}, url={}", meta.rating_key, deck, &url[..url.len().min(120)]);
+    debug!(rating_key = meta.rating_key, ?deck, "play command");
 
     // Cache ramps
     cache_ramps(meta, audio_cmd_tx);
@@ -564,8 +564,6 @@ fn handle_play(
             });
 
             // Swap pending → active; always resume to ensure playback starts
-            let state = atomics.get_state();
-            eprintln!("[audio-engine] transition: engine_state={:?}, sending TransitionToActive + Resume", state);
             let _ = audio_cmd_tx.send(AudioCommand::TransitionToActive { user_skip: true });
             let _ = audio_cmd_tx.send(AudioCommand::Resume);
 
@@ -907,7 +905,7 @@ fn fetch_and_decode_incremental(
 
     // ---- Cache HIT: decode from local file ----
     if let Some(cached_path) = cache.lookup(rating_key) {
-        eprintln!("[audio-engine] cache HIT: rating_key={}, path={}", rating_key, cached_path.display());
+        debug!(rating_key, path = %cached_path.display(), "cache hit — decoding from file");
         let file = std::fs::File::open(&cached_path)
             .map_err(|e| format!("cache read: {}", e))?;
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
@@ -918,7 +916,7 @@ fn fetch_and_decode_incremental(
     }
 
     // ---- Cache MISS: stream from HTTP, tee to disk ----
-    eprintln!("[audio-engine] cache MISS: rating_key={}, streaming from server", rating_key);
+    debug!(rating_key, "cache miss — streaming from server");
 
     use self::deck::streaming::{SharedBuffer, StreamingReader};
 

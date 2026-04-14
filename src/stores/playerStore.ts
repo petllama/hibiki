@@ -537,22 +537,18 @@ function _isPodcastTrack(track: MusicTrack): boolean {
 
 /** Send a track to the Web Audio engine for playback. */
 async function sendToAudioEngine(track: MusicTrack): Promise<void> {
-  console.log("[sendToAudioEngine] track.id=", track.id, "title=", track.title, "streamUrl=", track.streamUrl?.slice(0, 80))
   // Direct URL tracks (podcasts, external audio) bypass provider.getPlaybackInfo()
   if (track.streamUrl?.startsWith("http")) {
     const syntheticKey = Math.abs(hashCode(track.id))
-    console.log("[sendToAudioEngine] direct URL, syntheticKey=", syntheticKey)
     _ratingKeyToTrackId.set(syntheticKey, track.id)
     await engine.play(track.streamUrl, syntheticKey, track.duration, "", null, true)
     return
   }
   const provider = getProvider()
-  if (!provider) { console.log("[sendToAudioEngine] NO PROVIDER"); return }
+  if (!provider) return
   const info = await provider.getPlaybackInfo(track)
-  console.log("[sendToAudioEngine] trackKey=", info.trackKey, "url=", info.url?.slice(0, 80))
   _ratingKeyToTrackId.set(info.trackKey, track.id)
   const gainDb = await fetchGainDb(track)
-  console.log("[sendToAudioEngine] calling engine.play, gainDb=", gainDb)
   await engine.play(
     info.url,
     info.trackKey,
@@ -563,7 +559,6 @@ async function sendToAudioEngine(track: MusicTrack): Promise<void> {
     track.startRamp ?? info.startRamp,
     track.endRamp ?? info.endRamp,
   )
-  console.log("[sendToAudioEngine] engine.play returned")
 }
 
 /**
