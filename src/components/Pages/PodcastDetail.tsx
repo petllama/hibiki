@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { usePodcastStore } from "../../backends/podcast/store"
 import { usePlayerStore } from "../../stores/playerStore"
@@ -7,21 +7,51 @@ import { EpisodeRow } from "../EpisodeRow"
 import { UltraBlur } from "../UltraBlur"
 import type { PodcastDetail, PodcastEpisode } from "../../backends/podcast/api"
 
+/** Thin wrapper: subscribes to currentTrack only for its own trackId. */
+function ConnectedEpisodeRow({
+  episode,
+  trackId,
+  podcastArtworkUrl,
+  feedUrl,
+  onPlay,
+}: {
+  episode: PodcastEpisode
+  trackId: string | undefined
+  podcastArtworkUrl: string
+  feedUrl: string
+  onPlay: () => void
+}) {
+  const isPlaying = usePlayerStore(s => s.currentTrack?.id != null && s.currentTrack.id === trackId)
+  const { getEpisodeProgress, isEpisodeCompleted } = usePodcastStore(useShallow(s => ({
+    getEpisodeProgress: s.getEpisodeProgress,
+    isEpisodeCompleted: s.isEpisodeCompleted,
+  })))
+  const progressSecs = getEpisodeProgress(feedUrl, episode.guid)
+  const progress = episode.duration_secs > 0 ? progressSecs / episode.duration_secs : 0
+  const completed = isEpisodeCompleted(feedUrl, episode.guid)
+
+  return (
+    <EpisodeRow
+      episode={episode}
+      podcastArtworkUrl={podcastArtworkUrl}
+      isPlaying={isPlaying}
+      progress={progress}
+      isCompleted={completed}
+      onPlay={onPlay}
+    />
+  )
+}
+
 export function PodcastDetailPage({ feedUrl }: { feedUrl: string }) {
-  const { getFeed, subscribe, unsubscribe, subscriptions, getEpisodeProgress, isEpisodeCompleted } =
+  const { getFeed, subscribe, unsubscribe, subscriptions } =
     usePodcastStore(useShallow(s => ({
       getFeed: s.getFeed,
       subscribe: s.subscribe,
       unsubscribe: s.unsubscribe,
       subscriptions: s.subscriptions,
-      getEpisodeProgress: s.getEpisodeProgress,
-      isEpisodeCompleted: s.isEpisodeCompleted,
     })))
 
-  const { playTrack, currentTrack } = usePlayerStore(useShallow(s => ({
-    playTrack: s.playTrack,
-    currentTrack: s.currentTrack,
-  })))
+  const playTrack = usePlayerStore(s => s.playTrack)
 
   const [podcast, setPodcast] = useState<PodcastDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -50,16 +80,16 @@ export function PodcastDetailPage({ feedUrl }: { feedUrl: string }) {
     )
   }, [podcast, feedUrl])
 
-  const handlePlayEpisode = (ep: PodcastEpisode, index: number) => {
+  const handlePlayEpisode = useCallback((index: number) => {
     const track = episodeTracks[index]
     if (!track) return
     playTrack(track, episodeTracks, podcast?.title ?? "Podcast", `/podcast/${btoa(feedUrl)}`)
-  }
+  }, [episodeTracks, playTrack, podcast?.title, feedUrl])
 
-  const handlePlayAll = () => {
+  const handlePlayAll = useCallback(() => {
     if (episodeTracks.length === 0) return
     playTrack(episodeTracks[0], episodeTracks, podcast?.title ?? "Podcast", `/podcast/${btoa(feedUrl)}`)
-  }
+  }, [episodeTracks, playTrack, podcast?.title, feedUrl])
 
   const handleSubscribe = () => {
     if (!podcast) return
@@ -179,25 +209,16 @@ export function PodcastDetailPage({ feedUrl }: { feedUrl: string }) {
       <div className="px-4 pb-8">
         <h2 className="mb-2 px-4 pt-4 text-lg font-bold">Episodes</h2>
         <div className="divide-y divide-white/5">
-          {playableEpisodes.map((ep, i) => {
-            const trackId = episodeTracks[i]?.id
-            const isPlaying = trackId != null && currentTrack?.id === trackId
-            const progressSecs = getEpisodeProgress(feedUrl, ep.guid)
-            const progress = ep.duration_secs > 0 ? progressSecs / ep.duration_secs : 0
-            const completed = isEpisodeCompleted(feedUrl, ep.guid)
-
-            return (
-              <EpisodeRow
-                key={ep.guid || i}
-                episode={ep}
-                podcastArtworkUrl={podcast.artwork_url}
-                isPlaying={isPlaying}
-                progress={progress}
-                isCompleted={completed}
-                onPlay={() => handlePlayEpisode(ep, i)}
-              />
-            )
-          })}
+          {playableEpisodes.map((ep, i) => (
+            <ConnectedEpisodeRow
+              key={ep.guid || i}
+              episode={ep}
+              trackId={episodeTracks[i]?.id}
+              podcastArtworkUrl={podcast.artwork_url}
+              feedUrl={feedUrl}
+              onPlay={() => handlePlayEpisode(i)}
+            />
+          ))}
         </div>
       </div>
     </div>

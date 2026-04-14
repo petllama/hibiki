@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, memo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Link } from "wouter"
 import { open } from "@tauri-apps/plugin-shell"
@@ -36,9 +36,110 @@ function TagChip({ tag, tagType }: { tag: string; tagType: "genre" | "mood" | "s
   )
 }
 
+/** Album track row — subscribes to currentTrack individually to avoid cascading re-renders. */
+const AlbumTrackRow = memo(function AlbumTrackRow({
+  track,
+  idx,
+  albumTitle,
+  albumId,
+  albumArtistName,
+  hasRadio,
+  onPlay,
+  onAddToQueue,
+  onPlayRadio,
+  onContextMenu,
+  isCtxTarget,
+  trackDrag,
+}: {
+  track: MusicTrack
+  idx: number
+  albumTitle: string
+  albumId: string
+  albumArtistName: string
+  hasRadio: boolean
+  onPlay: () => void
+  onAddToQueue: () => void
+  onPlayRadio: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+  isCtxTarget: boolean
+  trackDrag: ReturnType<typeof useTrackDrag>
+}) {
+  const isActive = usePlayerStore(s => s.currentTrack?.id === track.id)
+
+  return (
+    <tr
+      className={`group cursor-pointer rounded ${isActive || isCtxTarget ? "bg-hl-row" : "hover:bg-hl-row"}`}
+      onClick={onPlay}
+      onMouseEnter={() => prefetchTrackAudio(track)}
+      onContextMenu={onContextMenu}
+      onPointerDown={e => trackDrag.onPointerDown(e, { type: "track", ids: [track.id], label: track.title, tracks: [track] })}
+      onPointerMove={trackDrag.onPointerMove}
+      onPointerUp={trackDrag.onPointerUp}
+    >
+      <td className="p-2 text-center w-8">
+        {isActive ? (
+          <>
+            <span className="group-hover:hidden flex items-center justify-center text-accent">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                <rect x="1" y="3" width="3" height="10" rx="1"/><rect x="6" y="1" width="3" height="12" rx="1"/><rect x="11" y="5" width="3" height="8" rx="1"/>
+              </svg>
+            </span>
+            <span className="hidden group-hover:flex items-center justify-center text-accent">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><polygon points="3,2 13,8 3,14" /></svg>
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="group-hover:hidden">{track.trackNumber || idx + 1}</span>
+            <span className="hidden group-hover:flex items-center justify-center">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                <polygon points="3,2 13,8 3,14" />
+              </svg>
+            </span>
+          </>
+        )}
+      </td>
+      <td className="p-2">
+        <div className={isActive ? "text-accent" : "text-white"}>{track.title}</div>
+        {track.originalTitle && track.originalTitle !== albumArtistName && (
+          <div className="text-xs text-gray-500">{track.originalTitle}</div>
+        )}
+      </td>
+      <td className="p-2 text-right" onClick={e => e.stopPropagation()}>
+        <HeroRating itemId={track.id} userRating={track.userRating} />
+      </td>
+      <td className="p-2 text-right w-36 tabular-nums">
+        <span className="group-hover:hidden">{formatMs(track.duration)}</span>
+        <div className="hidden group-hover:inline-flex items-center gap-2">
+          <button
+            className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-white transition-colors px-1"
+            title="Add to Queue"
+            onClick={e => { e.stopPropagation(); onAddToQueue() }}
+          >
+            <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor">
+              <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/>
+            </svg>
+            Queue
+          </button>
+          {hasRadio && <button
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors px-1"
+            title="Track Radio"
+            onClick={e => { e.stopPropagation(); onPlayRadio() }}
+          >
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+              <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8 5a3 3 0 1 0 0 6A3 3 0 0 0 8 5zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
+            </svg>
+            Radio
+          </button>}
+        </div>
+      </td>
+    </tr>
+  )
+})
+
 export function AlbumPage({ albumId }: { albumId: string }) {
   const provider = useProviderStore(s => s.provider)
-  const { playTrack, playRadio, addToQueue, addNext, currentTrack } = usePlayerStore(useShallow(s => ({ playTrack: s.playTrack, playRadio: s.playRadio, addToQueue: s.addToQueue, addNext: s.addNext, currentTrack: s.currentTrack })))
+  const { playTrack, playRadio, addToQueue, addNext } = usePlayerStore(useShallow(s => ({ playTrack: s.playTrack, playRadio: s.playRadio, addToQueue: s.addToQueue, addNext: s.addNext })))
   const { handler: ctxMenu, isTarget: isCtxTarget } = useContextMenu()
   const trackDrag = useTrackDrag()
   const pageRefreshKey = useUIStore(s => s.pageRefreshKey)
@@ -451,80 +552,23 @@ export function AlbumPage({ albumId }: { albumId: string }) {
             </tr>
           </thead>
           <tbody>
-            {tracks.map((track, idx) => {
-              const isActive = currentTrack?.id === track.id
-              const isContextTarget = isCtxTarget(track.id)
-              return (
-              <tr
+            {tracks.map((track, idx) => (
+              <AlbumTrackRow
                 key={track.id}
-                className={`group cursor-pointer rounded ${isActive || isContextTarget ? "bg-hl-row" : "hover:bg-hl-row"}`}
-                onClick={() => void playTrack(track, tracks, album.title, `/album/${albumId}`)}
-                onMouseEnter={() => prefetchTrackAudio(track)}
+                track={track}
+                idx={idx}
+                albumTitle={album.title}
+                albumId={albumId}
+                albumArtistName={album.artistName}
+                hasRadio={hasRadio}
+                onPlay={() => void playTrack(track, tracks, album.title, `/album/${albumId}`)}
+                onAddToQueue={() => addToQueue([track])}
+                onPlayRadio={() => void playRadio(track.id, 'track')}
                 onContextMenu={ctxMenu("track", track)}
-                onPointerDown={e => trackDrag.onPointerDown(e, { type: "track", ids: [track.id], label: track.title, tracks: [track] })}
-                onPointerMove={trackDrag.onPointerMove}
-                onPointerUp={trackDrag.onPointerUp}
-              >
-                <td className="p-2 text-center w-8">
-                  {isActive ? (
-                    <>
-                      <span className="group-hover:hidden flex items-center justify-center text-accent">
-                        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
-                          <rect x="1" y="3" width="3" height="10" rx="1"/><rect x="6" y="1" width="3" height="12" rx="1"/><rect x="11" y="5" width="3" height="8" rx="1"/>
-                        </svg>
-                      </span>
-                      <span className="hidden group-hover:flex items-center justify-center text-accent">
-                        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><polygon points="3,2 13,8 3,14" /></svg>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="group-hover:hidden">{track.trackNumber || idx + 1}</span>
-                      <span className="hidden group-hover:flex items-center justify-center">
-                        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
-                          <polygon points="3,2 13,8 3,14" />
-                        </svg>
-                      </span>
-                    </>
-                  )}
-                </td>
-                <td className="p-2">
-                  <div className={isActive ? "text-accent" : "text-white"}>{track.title}</div>
-                  {track.originalTitle && track.originalTitle !== album.artistName && (
-                    <div className="text-xs text-gray-500">{track.originalTitle}</div>
-                  )}
-                </td>
-                <td className="p-2 text-right" onClick={e => e.stopPropagation()}>
-                  <HeroRating itemId={track.id} userRating={track.userRating} />
-                </td>
-                <td className="p-2 text-right w-36 tabular-nums">
-                  <span className="group-hover:hidden">{formatMs(track.duration)}</span>
-                  <div className="hidden group-hover:inline-flex items-center gap-2">
-                    <button
-                      className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-white transition-colors px-1"
-                      title="Add to Queue"
-                      onClick={e => { e.stopPropagation(); addToQueue([track]) }}
-                    >
-                      <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor">
-                        <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/>
-                      </svg>
-                      Queue
-                    </button>
-                    {hasRadio && <button
-                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors px-1"
-                      title="Track Radio"
-                      onClick={e => { e.stopPropagation(); void playRadio(track.id, 'track') }}
-                    >
-                      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
-                        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8 5a3 3 0 1 0 0 6A3 3 0 0 0 8 5zm0 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
-                      </svg>
-                      Radio
-                    </button>}
-                  </div>
-                </td>
-              </tr>
-              )
-            })}
+                isCtxTarget={isCtxTarget(track.id)}
+                trackDrag={trackDrag}
+              />
+            ))}
           </tbody>
         </table>
       </div>

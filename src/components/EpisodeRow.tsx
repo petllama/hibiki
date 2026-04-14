@@ -1,3 +1,4 @@
+import { memo } from "react"
 import clsx from "clsx"
 import type { PodcastEpisode } from "../backends/podcast/api"
 
@@ -28,7 +29,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function EpisodeRow({ episode, podcastArtworkUrl, isPlaying, progress, isCompleted, onPlay }: EpisodeRowProps) {
+export const EpisodeRow = memo(function EpisodeRow({ episode, podcastArtworkUrl, isPlaying, progress, isCompleted, onPlay }: EpisodeRowProps) {
   const thumb = episode.artwork_url || podcastArtworkUrl
   const duration = formatDuration(episode.duration_secs)
   const date = formatDate(episode.pub_date)
@@ -92,4 +93,4 @@ export function EpisodeRow({ episode, podcastArtworkUrl, isPlaying, progress, is
       </div>
     </div>
   )
-}
+})
