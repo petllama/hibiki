@@ -12,10 +12,20 @@ use crossbeam_channel::{bounded, Sender};
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(target_os = "windows")]
 use tauri::Manager;
 use tauri::{AppHandle, Emitter, Runtime};
+
+fn epoch_ms() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64
+}
+
+/// How long after a user-initiated pause to suppress incoming Play/Toggle
+/// events from the OS (e.g. MPRIS signals during system suspend).
+const PAUSE_SUPPRESS_MS: u64 = 3000;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -88,6 +98,11 @@ impl MediaSessionState {
                     }
                 };
 
+                // Timestamp of last user-initiated pause — used to suppress
+                // spurious Play/Toggle events from the OS during system suspend.
+                let last_pause_at = Arc::new(AtomicU64::new(0));
+                let last_pause_for_cb = last_pause_at.clone();
+
                 // Forward OS media-key events to the frontend.
                 controls
                     .attach(move |event: MediaControlEvent| {
@@ -95,7 +110,24 @@ impl MediaSessionState {
                             MediaControlEvent::Play
                             | MediaControlEvent::Pause
                             | MediaControlEvent::Toggle => {
-                                app_handle.emit("media://play-pause", ()).ok();
+                                // Suppress Play/Toggle if we just paused — prevents
+                                // system suspend from toggling playback back on.
+                                let since_pause = epoch_ms().saturating_sub(
+                                    last_pause_for_cb.load(Ordering::Relaxed),
+                                );
+                                if since_pause < PAUSE_SUPPRESS_MS {
+                                    match event {
+                                        MediaControlEvent::Pause => {
+                                            // Always allow explicit Pause
+                                            app_handle.emit("media://play-pause", ()).ok();
+                                        }
+                                        _ => {
+                                            tracing::debug!("suppressing media Play/Toggle ({}ms after pause)", since_pause);
+                                        }
+                                    }
+                                } else {
+                                    app_handle.emit("media://play-pause", ()).ok();
+                                }
                             }
                             MediaControlEvent::Next => {
                                 app_handle.emit("media://next", ()).ok();
@@ -146,6 +178,7 @@ impl MediaSessionState {
                                 .ok();
                         }
                         MediaUpdate::Paused { position_ms } => {
+                            last_pause_at.store(epoch_ms(), Ordering::Relaxed);
                             controls
                                 .set_playback(MediaPlayback::Paused {
                                     progress: Some(MediaPosition(Duration::from_millis(
