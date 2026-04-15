@@ -1695,7 +1695,8 @@ export function SettingsPage({ section: sectionProp }: { section?: string }) {
     navigate(s === "backend" ? "/settings" : `/settings/${s}`)
   }
 
-  const navItems = [...NAV, EASTER_EGG_NAV]
+  const easterEggsUnlocked = useEasterEggStore(s => s.unlocked)
+  const navItems = easterEggsUnlocked ? [...NAV, EASTER_EGG_NAV] : NAV
 
   return (
     <div className="flex h-full">
