@@ -537,14 +537,21 @@ pub async fn sync_navidrome_full(
 
     let c = client!(state);
 
-    // Phase 1: Artists (albums FK to artists, so artists first)
+    // Disable FK constraints for the duration of the sync — delete-all + re-insert
+    // across related tables triggers cascading SET NULL on NOT NULL columns.
+    {
+        let conn = db.0.lock().map_err(|e| format!("db lock error: {e}"))?;
+        conn.execute_batch("PRAGMA foreign_keys = OFF;").map_err(|e| format!("pragma: {e}"))?;
+    }
+
+    // Phase 1: Artists
     let artist_rows = fetch_artist_rows(&c).await?;
     let artists = {
         let conn = db.0.lock().map_err(|e| format!("db lock error: {e}"))?;
         write_artists(&conn, &artist_rows)?
     };
 
-    // Phase 2: Albums (tracks FK to albums, so albums before tracks)
+    // Phase 2: Albums
     let album_rows = fetch_album_rows(&c).await?;
     let albums = {
         let conn = db.0.lock().map_err(|e| format!("db lock error: {e}"))?;
@@ -557,6 +564,12 @@ pub async fn sync_navidrome_full(
         let conn = db.0.lock().map_err(|e| format!("db lock error: {e}"))?;
         write_tracks(&conn, &track_rows)?
     };
+
+    // Re-enable FK constraints
+    {
+        let conn = db.0.lock().map_err(|e| format!("db lock error: {e}"))?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| format!("pragma: {e}"))?;
+    }
 
     let elapsed_ms = start.elapsed().as_millis() as u64;
     info!(
