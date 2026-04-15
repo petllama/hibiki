@@ -18,7 +18,7 @@ import { useNotificationStore } from "../../stores/notificationStore"
 import { useDebugStore } from "../../stores/debugStore"
 import { useUIStore, useConnectionStore } from "../../stores"
 import { useEasterEggStore } from "../../stores/easterEggStore"
-import { backends } from "../../backends/registry"
+import { backends, getBackend } from "../../backends/registry"
 import { metadataBackends, getMetadataBackend } from "../../metadata"
 import type { ProviderCapabilities } from "../../providers/types"
 import type { MetadataCapabilities } from "../../metadata/types"
@@ -1042,7 +1042,7 @@ function CapabilityGrid({ caps, labels }: { caps: { [k: string]: boolean }; labe
 
 function BackendSection() {
   const activeBackend = useConnectionStore(s => s.activeBackend)
-  const setActiveBackend = useConnectionStore(s => s.setActiveBackend)
+  const [viewedBackendId, setViewedBackendId] = useState<string | null>(null)
   const [imgCacheInfo, setImgCacheInfo] = useState<ImageCacheInfo | null>(null)
   const [imgClearing, setImgClearing] = useState(false)
 
@@ -1061,7 +1061,7 @@ function BackendSection() {
     }
   }
 
-  const backend = activeBackend ?? backends[0]
+  const backend = (viewedBackendId ? getBackend(viewedBackendId) : null) ?? activeBackend ?? backends[0]
   if (!backend) return null
 
   return (
@@ -1074,7 +1074,7 @@ function BackendSection() {
             {backends.map(b => (
               <button
                 key={b.id}
-                onClick={() => void setActiveBackend(b.id)}
+                onClick={() => setViewedBackendId(b.id)}
                 className={clsx(
                   "flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors",
                   b.id === backend.id
